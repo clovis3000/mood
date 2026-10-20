@@ -3,6 +3,8 @@ name = "mood"
 version = "0.1.0"
 edition = "2021"
 description = "Moodboards on disk: a browser canvas for humans, a CLI for Claude"
+license = "MIT"
+repository = "https://github.com/clovis3000/mood"
 
 [dependencies]
 anyhow = "1"
