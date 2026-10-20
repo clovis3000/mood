@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mood</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231b1b19'/%3E%3Cpath d='M5 17V9M5 12.5C5 10.3 6.6 9 8.5 9S12 10.3 12 12.5V17M12 12.5C12 10.3 13.6 9 15.5 9S19 10.3 19 12.5V17' fill='none' stroke='%23fbfbf9' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f3f2ef; --panel: #fbfbf9; --ink: #1b1b19; --mute: #85837c; --line: #e3e1db;
+  --lewis: #1b1b19; --claude: #c2603a;
+  --hover: rgba(27,27,25,.055); --shadow: 0 8px 28px rgba(27,27,25,.12), 0 1px 3px rgba(27,27,25,.08);
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --side: 360px;       /* set from SIDE in the script */
+  --hit: 44px;         /* minimum click target for chrome */
+  --r: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141413; --panel: #1b1b1a; --ink: #e8e6e1; --mute: #8a8780; --line: #2a2a27;
+    --lewis: #e8e6e1; --claude: #e58c63;
+    --hover: rgba(232,230,225,.07); --shadow: 0 8px 28px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141413; --panel: #1b1b1a; --ink: #e8e6e1; --mute: #8a8780; --line: #2a2a27;
+  --lewis: #e8e6e1; --claude: #e58c63;
+  --hover: rgba(232,230,225,.07); --shadow: 0 8px 28px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+  font: 13px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; }
+/* one cursor everywhere: affordance comes from hover states, not from the pointer changing shape */
+* { cursor: default; }
+input, textarea { cursor: text; }
+input, textarea { font: inherit; color: inherit; background: none; border: 0; outline: 0; padding: 0; width: 100%; }
+::placeholder { color: var(--mute); }
+.small { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+#stage { position: fixed; inset: 0; overflow: hidden; touch-action: none; }
+#grid { position: absolute; inset: 0; pointer-events: none; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+.it { position: absolute; user-select: none; }
+.it img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; }
+.it .tag { position: absolute; left: 0; top: 0; transform-origin: 0 0;
+  transform: scale(var(--iz)) translateY(-100%); font: 600 11px/1 var(--sans); font-variant-numeric: tabular-nums;
+  padding: 3px 5px 3px; background: var(--ink); color: var(--bg); white-space: nowrap;
+  opacity: 0; pointer-events: none; }
+.it:hover .tag, .it.on .tag, body.ids .it .tag { opacity: 1; }
+.it .dots { position: absolute; right: 0; top: 0; transform-origin: 100% 0; transform: scale(var(--iz));
+  display: flex; gap: 4px; padding: 7px; pointer-events: none; }
+.it .dots i { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1.5px #fff; }
+.it .dots i.c { background: #c2603a; }
+.it .dots i.l { background: #1b1b19; }
+.it .rate { position: absolute; left: 0; bottom: 0; transform-origin: 0 100%; transform: scale(var(--iz));
+  font: 600 12px/1 var(--sans); font-variant-numeric: tabular-nums; padding: 4px 7px; background: #1b1b19; color: #fbfbf9; pointer-events: none; }
+.it .rate:empty { display: none; }
+body.nomarks .it .dots, body.nomarks .it .rate { display: none; }
+
+#marq { position: absolute; pointer-events: none; border: 1px solid var(--ink);
+  background: color-mix(in srgb, var(--ink) 8%, transparent); }
+#grp { position: absolute; left: 0; top: 0; pointer-events: none; outline: 1px solid var(--ink); outline-offset: 6px; }
+.it.grp::after { content: ""; position: absolute; inset: 0; pointer-events: none; border: calc(1.5px * var(--iz)) solid var(--ink); }
+.it.grp .tag { opacity: 1; }
+#sel { position: absolute; left: 0; top: 0; pointer-events: none; outline: 1.5px solid var(--ink); outline-offset: 4px; }
+#sel .handle { position: absolute; right: -10px; bottom: -10px; width: 9px; height: 9px; pointer-events: auto;
+  background: var(--panel); border: 1.5px solid var(--ink); }
+
+/* chrome: every control is at least --hit square */
+.chrome { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.ib { display: grid; place-items: center; width: var(--hit); height: var(--hit); border-radius: var(--r); color: var(--mute); }
+.ib:hover, .ib[aria-expanded="true"] { color: var(--ink); background: var(--hover); }
+.ib svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+button:focus-visible, [role="switch"]:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+#hud button:focus:not(:focus-visible) { outline: 0; }
+
+#home-btn { color: var(--ink); }
+#home-btn svg { width: 28px; height: 28px; stroke-width: 2.2; }
+#hud .sep { width: 1px; height: 22px; margin: 0 2px; background: var(--line); }
+#hud { position: fixed; top: 12px; left: 12px; display: flex; align-items: center; z-index: 5; }
+#hud .bar { display: flex; align-items: center; gap: 2px; padding: 3px; }   /* equal inset around both segments */
+#bname { height: var(--hit); padding: 0 16px; font-size: 18px; font-weight: 600; letter-spacing: -.015em;
+  border-radius: 9px; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bname:hover { background: var(--hover); }
+#bsw { border-radius: 9px; }
+#menu { position: absolute; top: calc(var(--hit) + 14px); left: 0; min-width: 260px; max-height: 70vh; overflow-y: auto;
+  padding: 6px; }
+#menu ul { margin: 0; padding: 0; }
+#menu li { list-style: none; min-height: var(--hit); padding: 0 12px; border-radius: 8px; font-size: 15px;
+  display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+#menu li:hover { background: var(--hover); }
+#menu li.cur { font-weight: 600; }
+#menu li span { color: var(--mute); font-size: 13px; font-weight: 400; font-variant-numeric: tabular-nums; }
+#menu input { height: var(--hit); padding: 0 12px; font-size: 15px; margin-top: 6px; border-top: 1px solid var(--line);
+  border-radius: 0 0 8px 8px; }
+
+/* home page: the board chrome steps aside */
+body.home #hud, body.home #cog, body.home #settings, body.home #status, body.home #keys, body.home #stage, body.home #zoom,
+body.home #empty, body.home #side { display: none !important; }
+#home { position: fixed; inset: 0; overflow-y: auto; padding: 0 clamp(20px, 5vw, 64px) 72px; }
+#home header { display: flex; align-items: center; height: 84px; }
+.wordmark { height: 34px; width: auto; fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+#cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1360px; }
+.card { display: flex; flex-direction: column; border-radius: 14px; background: var(--panel); border: 1px solid var(--line);
+  overflow: hidden; color: inherit; text-decoration: none; transition: box-shadow .15s, transform .15s, border-color .15s; }
+a.card:hover, .card.new:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+.card .pv { position: relative; display: grid; gap: 2px; aspect-ratio: 4 / 3; background: var(--bg);
+  border-bottom: 1px solid var(--line); overflow: hidden; }
+.card .pv img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: cover; background: var(--line); }
+.card .pv .none { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mute); font-size: 13px; }
+/* mosaic: a hero plus tiles, so a handful of images stay large enough to read */
+.pv.n1 { grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+.pv.n2 { grid-template: minmax(0, 1fr) / repeat(2, minmax(0, 1fr)); }
+.pv.n3 { grid-template: repeat(2, minmax(0, 1fr)) / minmax(0, 2fr) minmax(0, 1fr); }
+.pv.n3 img:first-child { grid-row: span 2; }
+.pv.n4 { grid-template: repeat(2, minmax(0, 1fr)) / repeat(2, minmax(0, 1fr)); }
+.pv.n6 { grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr)); }
+.pv.n6 img:first-child { grid-area: 1 / 1 / 3 / 3; }
+.card .meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 18px; min-height: 60px; }
+.card .meta b { font-size: 16px; font-weight: 600; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .meta span { flex: none; color: var(--mute); font-size: 13px; font-variant-numeric: tabular-nums; }
+.card.new { border-style: dashed; background: transparent; align-items: center; justify-content: center;
+  gap: 10px; min-height: 160px; color: var(--mute); font-size: 15px; font-weight: 500; }
+.card.new:hover, .card.new:focus-visible { color: var(--ink); border-color: var(--mute); }
+.card.new svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.card.new input { width: calc(100% - 40px); height: var(--hit); padding: 0 14px; border-radius: var(--r); background: var(--panel);
+  box-shadow: inset 0 0 0 1.5px var(--ink); font-size: 15px; color: var(--ink); text-align: center; }
+.card.new small { font-size: 12px; font-weight: 400; }
+#cog { position: fixed; left: 12px; bottom: 12px; z-index: 5; }
+#status { position: fixed; right: 16px; bottom: 12px; height: 28px; display: flex; align-items: center; gap: 14px;
+  color: var(--mute); z-index: 5; pointer-events: none; }
+body.open #status { right: calc(var(--side) + 16px); }
+#st-sel:empty { display: none; }
+#st-cell { min-width: 4.5ch; }                    /* fixed slots so a longer cell name or a minus sign can't shift the readout */
+/* zoom bar: scroll over it to zoom, so the two-finger gesture that pans the board zooms it too */
+#zoom { position: fixed; left: 12px; top: 50%; transform: translateY(-50%); width: var(--hit); height: 220px;
+  display: grid; place-items: center; z-index: 5; touch-action: none; }
+#zoom .track { position: relative; width: 20px; height: 180px; border-radius: 10px; background: var(--panel);
+  border: 1px solid var(--line); box-shadow: var(--shadow); transition: width .15s; overflow: hidden; }
+#zoom:hover .track, #zoom.on .track { width: 24px; }
+/* everything sits inside the pill, 3px in: a level fill, a faint 100% mark, and a soft handle at the level */
+#zoom .fill { position: absolute; left: 3px; right: 3px; bottom: 3px; border-radius: 7px;
+  height: calc((100% - 6px) * var(--zt, .5)); background: color-mix(in srgb, var(--ink) 10%, transparent); }
+#zoom .one { position: absolute; left: 6px; right: 6px; height: 1px; background: color-mix(in srgb, var(--ink) 22%, transparent);
+  bottom: calc(3px + (100% - 6px) * var(--z1, .5)); }
+#zoom .knob { position: absolute; left: 3px; right: 3px; height: 6px; border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 45%, transparent);
+  bottom: clamp(3px, calc(3px + (100% - 6px) * var(--zt, .5) - 3px), calc(100% - 9px)); transition: background .15s; }
+#zoom:hover .knob, #zoom.on .knob { background: color-mix(in srgb, var(--ink) 70%, transparent); }
+#settings { position: fixed; left: 12px; bottom: calc(var(--hit) + 20px); width: 300px; padding: 8px; z-index: 7; }
+#settings h2 { margin: 0; padding: 10px 12px 6px; font-size: 12px; font-weight: 600; color: var(--mute);
+  text-transform: uppercase; letter-spacing: .06em; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: var(--hit);
+  padding: 6px 12px; border-radius: 8px; text-align: left; font-size: 15px; }
+.row:hover { background: var(--hover); }
+.row small { display: block; color: var(--mute); font-size: 12px; line-height: 1.3; margin-top: 1px; }
+.sw { flex: none; position: relative; width: 40px; height: 24px; border-radius: 12px; background: var(--line);
+  transition: background .15s; box-shadow: inset 0 0 0 1px rgba(128,128,128,.25); }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
+[aria-checked="true"] > .sw { background: var(--ink); }
+[aria-checked="true"] > .sw::after { transform: translateX(16px); background: var(--bg); }
+.seg { display: flex; padding: 3px; border-radius: 9px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+.seg button { min-height: 38px; min-width: 54px; padding: 0 10px; border-radius: 7px; font-size: 13px; color: var(--mute); }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+#settings hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
+
+#keys { position: fixed; right: 16px; bottom: 48px; color: var(--mute); z-index: 4; text-align: right; line-height: 1.8;
+  font-size: 12.5px; letter-spacing: -.003em; }
+body.open #keys { right: calc(var(--side) + 16px); }
+#toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; z-index: 9; opacity: 0; transition: opacity .2s; pointer-events: none; }
+#toast.on { opacity: 1; }
+#empty { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; color: var(--mute); text-align: center; }
+#empty div { line-height: 2; }
+
+#side { position: fixed; top: 0; right: 0; bottom: 0; width: var(--side); background: var(--panel);
+  border-left: 1px solid var(--line); z-index: 6; display: flex; flex-direction: column; gap: 18px;
+  padding: 12px 24px 20px; overflow-y: auto; font-size: 14px; letter-spacing: -.003em; }
+#side header { display: flex; justify-content: space-between; align-items: center; margin-right: -12px; min-height: var(--hit); }
+#s-meta { color: var(--mute); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+#s-meta b { color: var(--ink); font-weight: 600; }
+#s-meta .by-claude { color: var(--claude); }
+#s-close svg { width: 18px; height: 18px; }
+#s-fig { margin: 0; background: var(--bg); display: grid; place-items: center; border-radius: var(--r);
+  overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+#s-img { display: block; max-width: 100%; max-height: 36vh; }
+#s-title { font-size: 20px; line-height: 1.25; font-weight: 600; letter-spacing: -.02em; margin-bottom: -10px; }
+.srcrow { display: flex; gap: 8px; align-items: center; }
+#s-src { color: var(--mute); font-size: 13px; text-overflow: ellipsis; }
+#s-src:focus { color: var(--ink); }
+#s-open { flex: none; display: grid; place-items: center; width: 40px; height: 40px; margin-right: -12px; border-radius: 8px;
+  color: var(--mute); text-decoration: none; }
+#s-open:hover { color: var(--ink); background: var(--hover); }
+#s-open svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 12px; font-weight: 600;
+  color: var(--mute); text-transform: uppercase; letter-spacing: .06em; }
+.label em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 13px; color: var(--ink); }
+#s-rate { display: grid; grid-template-columns: repeat(9, 1fr); border-radius: 9px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line); }
+#s-rate button { height: var(--hit); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--mute);
+  border-left: 1px solid var(--line); transition: background .1s, color .1s; }
+#s-rate button:first-child { border-left: 0; }
+#s-rate button:hover { color: var(--ink); background: var(--hover); }
+#s-rate button.on { background: var(--ink); color: var(--bg); font-weight: 600; }
+#s-scale { display: flex; justify-content: space-between; color: var(--mute); font-size: 11.5px; margin-top: 6px; }
+#side.board #s-rating { display: none; }
+
+#s-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+#s-notes:empty { display: none; }
+.n { display: grid; grid-template-columns: 20px 1fr 24px; gap: 8px; align-items: start; padding: 8px 6px 8px 10px;
+  margin: 0 -10px 0 -10px; border-radius: 8px; color: var(--lewis); }
+.n:hover { background: var(--hover); }
+.n.c { color: var(--claude); }
+.n i { display: grid; place-items: center; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; font: normal 600 13px/1 var(--sans);
+  background: color-mix(in srgb, currentColor 13%, transparent); }
+.n p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.n .x { opacity: 0; color: var(--mute); width: 24px; height: 24px; border-radius: 6px; font-size: 16px; line-height: 1; }
+.n .x:hover { color: var(--ink); background: var(--hover); }
+.n:hover .x { opacity: 1; }
+#s-in { resize: none; min-height: 44px; padding: 11px 14px; line-height: 1.45; border-radius: var(--r); background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .12s; }
+#s-in:focus { box-shadow: inset 0 0 0 1.5px var(--ink); }
+#side footer { margin-top: auto; display: flex; gap: 16px; color: var(--mute); font-size: 12px; }
+#side footer .l::before, #side footer .c::before { content: ""; display: inline-block; width: 7px; height: 7px;
+  border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+#side footer .l::before { background: var(--lewis); }
+#side footer .c::before { background: var(--claude); }
+#side.board #s-fig, #side.board #s-title, #side.board .srcrow { display: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="grid"></canvas>
+  <div id="world"></div>
+  <div id="grp" hidden></div>
+  <div id="marq" hidden></div>
+  <div id="sel" hidden><div class="handle"></div></div>
+</div>
+
+<div id="hud">
+  <div class="bar chrome">
+    <a id="home-btn" class="ib" href="/" title="all moodboards" aria-label="all moodboards">
+      <svg viewBox="0 0 24 24"><path d="M5 17V9M5 12.5C5 10.3 6.6 9 8.5 9S12 10.3 12 12.5V17M12 12.5C12 10.3 13.6 9 15.5 9S19 10.3 19 12.5V17"/></svg></a>
+    <i class="sep"></i>
+    <button id="bname" title="board notes"></button>
+    <button id="bsw" class="ib" title="switch board" aria-label="switch board" aria-expanded="false">
+      <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+  </div>
+  <div id="menu" class="chrome" hidden><ul></ul><input id="newb" placeholder="new board…" spellcheck="false"></div>
+</div>
+
+<main id="home" hidden>
+  <header><svg class="wordmark" viewBox="3.5 1.5 55.2 17" role="img" aria-label="mood"><path d="M5 17V9M5 12.5C5 10.3 6.6 9 8.5 9S12 10.3 12 12.5V17M12 12.5C12 10.3 13.6 9 15.5 9S19 10.3 19 12.5V17"/><circle cx="27.8" cy="13" r="4"/><circle cx="40.6" cy="13" r="4"/><circle cx="53.4" cy="13" r="4"/><path d="M57.4 3V17"/></svg></header>
+  <div id="cards"></div>
+</main>
+
+<div id="empty" hidden><div>paste or drop images<br><span class="small">⌘V an image, a file, or a page URL</span></div></div>
+<button id="cog" class="ib chrome" title="settings" aria-label="settings" aria-expanded="false">
+  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
+<div id="settings" class="chrome" role="dialog" aria-label="settings" hidden>
+  <h2>Canvas</h2>
+  <button class="row" role="switch" data-pref="grid"><span>Grid lines</span><i class="sw"></i></button>
+  <button class="row" role="switch" data-pref="labels"><span>Cell labels<small>A1, C3… on each grid cell</small></span><i class="sw"></i></button>
+  <button class="row" role="switch" data-pref="ids"><span>Item numbers<small>always show #id on images</small></span><i class="sw"></i></button>
+  <button class="row" role="switch" data-pref="marks"><span>Ratings &amp; note markers<small>badges on images</small></span><i class="sw"></i></button>
+  <hr>
+  <h2>Interface</h2>
+  <button class="row" role="switch" data-pref="keys"><span>Keyboard hints<small>pin the shortcut list</small></span><i class="sw"></i></button>
+  <div class="row"><span>Theme</span>
+    <div class="seg" id="theme"><button data-theme="system">Auto</button><button data-theme="light">Light</button><button data-theme="dark">Dark</button></div></div>
+</div>
+<div id="status" class="small"><span id="st-sel"></span><span id="st-cell"></span></div>
+<div id="zoom" role="slider" aria-label="zoom" aria-orientation="vertical" aria-valuemin="3" aria-valuemax="600" title="scroll here to zoom">
+  <div class="track"><i class="fill"></i><i class="one"></i><i class="knob"></i></div>
+</div>
+<div id="keys" hidden></div>
+<div id="toast" class="small"></div>
+
+<aside id="side" hidden>
+  <header><span id="s-meta"></span>
+    <button id="s-close" class="ib" aria-label="close" title="close"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></header>
+  <figure id="s-fig"><img id="s-img" alt=""></figure>
+  <input id="s-title" placeholder="untitled" spellcheck="false" autocomplete="off">
+  <div class="srcrow">
+    <input id="s-src" placeholder="source" spellcheck="false" autocomplete="off">
+    <a id="s-open" target="_blank" rel="noreferrer" title="open source"><svg viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
+  </div>
+  <section id="s-rating">
+    <div class="label"><span>Rating</span><em id="s-word">unrated</em></div>
+    <div id="s-rate"><button data-r="1">1</button><button data-r="2">2</button><button data-r="3">3</button><button data-r="4">4</button><button data-r="5">5</button><button data-r="6">6</button><button data-r="7">7</button><button data-r="8">8</button><button data-r="9">9</button></div>
+    <div id="s-scale"><span>repels</span><span>essential</span></div>
+  </section>
+  <ol id="s-notes"></ol>
+  <textarea id="s-in" rows="1" placeholder="Add a note   ·   + like   ·   − dislike"></textarea>
+  <footer><span class="l">you</span><span class="c">claude</span></footer>
+</aside>
+
+<script>
+const CELL = 1000;              // world units per grid cell — matches store.rs
+const TIERS = [256, 512, 1024, 2048];  // long sides of the server's sized copies — matches store.rs
+const ME = 'lewis';
+const SIDE = 360;               // sidebar width; mirrored into --side below
+document.documentElement.style.setProperty('--side', SIDE + 'px');
+const $ = s => document.querySelector(s);
+const stage = $('#stage'), world = $('#world'), gridCv = $('#grid'), selEl = $('#sel'), side = $('#side');
+
+let board = null, rev = '', meta = { notes: [] };
+const items = new Map(), els = new Map();
+let cam = { x: -60, y: -60, z: 0.5 };
+let selected = null;            // item id | 'board' | null
+let group = new Set();          // ids of a multi-selection (size > 1); selected is null while one exists
+let spaceDown = false;
+
+// ---------- preferences (per browser, shared across boards) ----------
+const PREF_DEFAULTS = { grid: true, labels: true, ids: false, marks: true, keys: false, theme: 'system' };
+const prefs = { ...PREF_DEFAULTS };
+try { Object.assign(prefs, JSON.parse(localStorage.getItem('prefs') || '{}')); } catch {}
+let mouse = { x: innerWidth / 2, y: innerHeight / 2 };
+let drag = null;
+const trashed = [];
+
+// ---------- utils ----------
+const ls = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+async function api(path, opts = {}) {
+  // the server refuses writes without x-mood, which other sites can't send
+  const r = await fetch(path, { ...opts, headers: { ...opts.headers, 'x-mood': '1' } });
+  if (!r.ok) throw new Error(await r.text() || r.statusText);
+  return (r.headers.get('content-type') || '').includes('json') ? r.json() : r.text();
+}
+const bapi = (p, o) => api(`/api/b/${encodeURIComponent(board)}${p}`, o);
+const json = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ih = it => it.w * it.ih / Math.max(1, it.iw);
+const fileUrl = it => `/api/b/${encodeURIComponent(board)}/file/${it.file}?v=${encodeURIComponent(it.added)}`;
+// gif stays whole so it keeps animating; mirrors tierable() in store.rs
+const tierable = file => /\.(jpg|png|webp)$/.test(file);
+// the smallest copy at least `px` on its long side, or the original once no copy would be smaller
+function srcFor(it, px) {
+  const t = TIERS.find(t => t >= px);
+  if (!t || !tierable(it.file) || t >= Math.max(it.iw, it.ih)) return fileUrl(it);
+  return `/api/b/${encodeURIComponent(board)}/img/${t}/${it.file}?v=${encodeURIComponent(it.added)}`;
+}
+const toWorld = (sx, sy) => ({ x: cam.x + sx / cam.z, y: cam.y + sy / cam.z });
+const toScreen = (wx, wy) => ({ x: (wx - cam.x) * cam.z, y: (wy - cam.y) * cam.z });
+
+function colLabel(c) {
+  if (c < 0) return '-' + colLabel(-c - 1);
+  let s = '', n = c + 1;
+  while (n > 0) { n--; s = String.fromCharCode(65 + n % 26) + s; n = Math.floor(n / 26); }
+  return s;
+}
+const rowLabel = r => String(r >= 0 ? r + 1 : r);
+const cellAt = (wx, wy) => colLabel(Math.floor(wx / CELL)) + rowLabel(Math.floor(wy / CELL));
+const cellOf = it => cellAt(it.x + it.w / 2, it.y + ih(it) / 2);
+
+let toastT = 0;
+function toast(msg, sticky = false) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastT); if (!sticky) toastT = setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+// ---------- camera ----------
+let raf = 0, camSave = 0;
+function applyCam() {
+  if (raf) return;
+  raf = requestAnimationFrame(() => {
+    raf = 0;
+    world.style.transform = `translate(${-cam.x * cam.z}px, ${-cam.y * cam.z}px) scale(${cam.z})`;
+    world.style.setProperty('--iz', 1 / cam.z);
+    drawGrid(); drawSel(); status(); drawZoom(); lodSoon();
+    clearTimeout(camSave); camSave = setTimeout(() => board && ls.set('cam:' + board, cam), 300);
+  });
+}
+const ZMIN = 0.03, ZMAX = 6;
+function zoomAt(sx, sy, f) {
+  const w = toWorld(sx, sy);
+  cam.z = Math.min(ZMAX, Math.max(ZMIN, cam.z * f));
+  cam.x = w.x - sx / cam.z; cam.y = w.y - sy / cam.z;
+  applyCam();
+}
+function frame(x0, y0, x1, y1, maxZ) {
+  const W = innerWidth - (selected !== null ? SIDE : 0), H = innerHeight, pad = 80;
+  const z = Math.min((W - pad * 2) / Math.max(1, x1 - x0), (H - pad * 2) / Math.max(1, y1 - y0), maxZ);
+  cam = { z, x: (x0 + x1) / 2 - W / 2 / z, y: (y0 + y1) / 2 - H / 2 / z };
+  applyCam();
+}
+function fit() {
+  if (!items.size) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const it of items.values()) {
+    x0 = Math.min(x0, it.x); y0 = Math.min(y0, it.y);
+    x1 = Math.max(x1, it.x + it.w); y1 = Math.max(y1, it.y + ih(it));
+  }
+  frame(x0, y0, x1, y1, 1.2);
+}
+function focusItem(it) { frame(it.x, it.y, it.x + it.w, it.y + ih(it), 4); }
+
+function status() {
+  const w = toWorld(mouse.x, mouse.y);
+  $('#st-sel').textContent = group.size ? `${group.size} selected` : '';
+  $('#st-cell').textContent = cellAt(w.x, w.y);
+}
+
+function drawGrid() {
+  const dpr = devicePixelRatio || 1, W = innerWidth, H = innerHeight;
+  if (gridCv.width !== W * dpr || gridCv.height !== H * dpr) {
+    gridCv.width = W * dpr; gridCv.height = H * dpr;
+    gridCv.style.width = W + 'px'; gridCv.style.height = H + 'px';
+  }
+  const g = gridCv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const span = CELL * cam.z;
+  if (!prefs.grid && !prefs.labels || span < 24) return;
+  const css = getComputedStyle(document.documentElement);
+  const tl = toWorld(0, 0), br = toWorld(W, H);
+  const c0 = Math.floor(tl.x / CELL), c1 = Math.ceil(br.x / CELL);
+  const r0 = Math.floor(tl.y / CELL), r1 = Math.ceil(br.y / CELL);
+  if (prefs.grid) {
+    g.strokeStyle = css.getPropertyValue('--line'); g.lineWidth = 1; g.beginPath();
+    for (let c = c0; c <= c1; c++) { const x = Math.round((c * CELL - cam.x) * cam.z) + .5; g.moveTo(x, 0); g.lineTo(x, H); }
+    for (let r = r0; r <= r1; r++) { const y = Math.round((r * CELL - cam.y) * cam.z) + .5; g.moveTo(0, y); g.lineTo(W, y); }
+    g.stroke();
+  }
+  if (span < 70 || !prefs.labels) return;
+  g.fillStyle = css.getPropertyValue('--mute'); g.font = '11px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif'; g.textBaseline = 'top';
+  for (let c = c0; c < c1; c++) for (let r = r0; r < r1; r++) {
+    const p = toScreen(c * CELL, r * CELL);
+    g.fillText(colLabel(c) + rowLabel(r), p.x + 7, p.y + 7);
+  }
+}
+
+// ---------- image sizes ----------
+// Each tile loads the smallest copy that's sharp at the current zoom, so a board of
+// 2000px originals shown at 10% holds a few MB of bitmaps instead of hundreds.
+// Tiles well off screen drop to the smallest copy, which frees the big bitmap.
+let lodOn = false, lodT = 0;
+const LOD_MS = 200;
+function lod(it, el) {
+  if (!lodOn) return;
+  const img = el.querySelector('img');
+  if (img.dataset.whole) return;
+  const m = 0.5, W = innerWidth, H = innerHeight;
+  const tl = toWorld(-W * m, -H * m), br = toWorld(W * (1 + m), H * (1 + m));
+  const near = it.x < br.x && it.x + it.w > tl.x && it.y < br.y && it.y + ih(it) > tl.y;
+  const src = srcFor(it, near ? Math.max(it.w, ih(it)) * cam.z * devicePixelRatio : 0);
+  if (img.getAttribute('src') !== src) img.src = src;
+}
+function lodAll() { lodT = 0; for (const [id, el] of els) { const it = items.get(id); if (it) lod(it, el); } }
+function lodSoon() { if (!lodT) lodT = setTimeout(lodAll, LOD_MS); }
+
+// ---------- items ----------
+function syncEl(it) {
+  let el = els.get(it.id);
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'it'; el.dataset.id = it.id;
+    el.innerHTML = '<img draggable="false" decoding="async" alt=""><b class="tag"></b><span class="dots"></span><b class="rate"></b>';
+    // a copy the server couldn't make (undecodable file): show the original and stop asking
+    el.querySelector('img').addEventListener('error', e => {
+      const img = e.target, it = items.get(+el.dataset.id);
+      if (img.dataset.whole || !it) return;
+      img.dataset.whole = 1; img.src = fileUrl(it);
+    });
+    world.append(el); els.set(it.id, el);
+  }
+  const s = el.style;
+  s.left = it.x + 'px'; s.top = it.y + 'px'; s.width = it.w + 'px'; s.height = ih(it) + 'px'; s.zIndex = it.z;
+  lod(it, el);
+  el.classList.toggle('on', selected === it.id);
+  el.classList.toggle('grp', group.has(it.id));
+  el.querySelector('.tag').textContent = '#' + it.id;
+  el.querySelector('.rate').textContent = it.rating ?? '';
+  const c = it.notes.some(n => n.by === 'claude'), l = it.notes.some(n => n.by !== 'claude');
+  el.querySelector('.dots').innerHTML = (c ? '<i class="c"></i>' : '') + (l ? '<i class="l"></i>' : '');
+}
+function dropEl(id) { els.get(id)?.remove(); els.delete(id); items.delete(id); }
+function raise(it) {
+  let max = 0; for (const o of items.values()) max = Math.max(max, o.z);
+  if (it.z !== max || [...items.values()].filter(o => o.z === max).length > 1) { it.z = max + 1; syncEl(it); }
+}
+async function patch(id, body) {
+  try { const it = await bapi(`/items/${id}`, json('PATCH', body)); items.set(id, it); syncEl(it); renderSide(); }
+  catch (e) { toast(e.message); }
+}
+
+function paintGroup() { for (const [id, el] of els) el.classList.toggle('grp', group.has(id)); }
+function drawGroup() {
+  const g = $('#grp');
+  g.hidden = group.size < 2;
+  if (g.hidden) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const id of group) { const it = items.get(id); if (!it) continue;
+    x0 = Math.min(x0, it.x); y0 = Math.min(y0, it.y); x1 = Math.max(x1, it.x + it.w); y1 = Math.max(y1, it.y + ih(it)); }
+  const p = toScreen(x0, y0);
+  g.style.transform = `translate(${p.x}px, ${p.y}px)`;
+  g.style.width = (x1 - x0) * cam.z + 'px'; g.style.height = (y1 - y0) * cam.z + 'px';
+}
+function drawSel() {
+  drawGroup();
+  const it = typeof selected === 'number' ? items.get(selected) : null;
+  selEl.hidden = !it;
+  if (!it) return;
+  const p = toScreen(it.x, it.y);
+  selEl.style.transform = `translate(${p.x}px, ${p.y}px)`;
+  selEl.style.width = it.w * cam.z + 'px'; selEl.style.height = ih(it) * cam.z + 'px';
+}
+
+// ---------- board ----------
+async function refresh() {
+  const d = await bapi('');
+  rev = d.rev; meta = d.meta;
+  const seen = new Set();
+  for (const it of d.items) {
+    seen.add(it.id);
+    if (drag?.items?.some(o => o.it.id === it.id) || drag?.it?.id === it.id) continue;
+    items.set(it.id, it); syncEl(it);
+  }
+  for (const id of [...items.keys()]) if (!seen.has(id)) { dropEl(id); group.delete(id); if (selected === id) select(null); }
+  if (group.size < 2 && group.size) setGroup(group);
+  $('#empty').hidden = items.size > 0;
+  $('#keys').hidden = items.size > 0 && !prefs.keys;
+  drawSel(); renderSide();
+}
+async function openBoard(name) {
+  board = name;
+  history.replaceState(null, '', '/b/' + encodeURIComponent(name));
+  document.title = name + ' · mood';
+  $('#bname').textContent = name;
+  for (const id of [...items.keys()]) dropEl(id);
+  select(null);
+  api('/api/current', json('POST', { name })).catch(() => {});
+  lodOn = false;                  // tiles wait for the camera, so nothing loads at the wrong size
+  await refresh();
+  const saved = ls.get('cam:' + name);
+  if (saved && Number.isFinite(saved.z) && saved.z > 0) { cam = saved; applyCam(); }
+  else if (items.size) fit();
+  else { cam = { x: -60, y: -60, z: 0.5 }; applyCam(); }
+  lodOn = true; lodAll();
+}
+setInterval(async () => {
+  if (!board || drag || document.hidden) return;
+  try { const r = await bapi('/rev'); if (r.rev !== rev) await refresh(); } catch {}
+}, 1500);
+
+// ---------- sidebar ----------
+function setGroup(set) {
+  if (set.size === 0) return select(null);
+  if (set.size === 1) return select([...set][0]);
+  select(null); group = set; paintGroup(); drawSel(); status();
+}
+function select(id) {
+  const was = selected;
+  selected = id;
+  if (group.size) { group = new Set(); paintGroup(); }
+  for (const el of els.values()) el.classList.toggle('on', +el.dataset.id === id);
+  side.hidden = id === null;
+  document.body.classList.toggle('open', id !== null);
+  if (id !== was) { $('#s-in').value = ''; autosize(); }
+  if (board) history.replaceState(null, '', `/b/${encodeURIComponent(board)}${id === null ? '' : '#' + id}`);
+  renderSide(); drawSel();
+}
+const GLYPH = { like: '+', dislike: '−', note: '·' };
+function renderSide() {
+  if (selected === null) return;
+  const isBoard = selected === 'board';
+  const it = isBoard ? null : items.get(selected);
+  if (!isBoard && !it) return select(null);
+  side.classList.toggle('board', isBoard);
+  if (it) {
+    const src = srcFor(it, Math.max(SIDE, innerHeight * 0.36) * devicePixelRatio);
+    if ($('#s-img').getAttribute('src') !== src) $('#s-img').src = src;
+    const by = it.added_by === 'claude' ? ' · <span class="by-claude">claude</span>' : '';
+    $('#s-meta').innerHTML = `<b>#${it.id}</b> · ${cellOf(it)} · ${it.iw}×${it.ih}${by}`;
+    if (document.activeElement !== $('#s-title')) $('#s-title').value = it.title;
+    if (document.activeElement !== $('#s-src')) $('#s-src').value = it.source;
+    const link = /^https?:\/\//.test(it.source);
+    $('#s-open').hidden = !link; if (link) $('#s-open').href = it.source;
+    for (const b of $('#s-rate').children) b.classList.toggle('on', +b.dataset.r === it.rating);
+    $('#s-word').textContent = it.rating ? RATING_WORDS[it.rating] : 'unrated';
+  } else {
+    $('#s-meta').innerHTML = `Board · <b>${esc(board)}</b>`;
+  }
+  const notes = isBoard ? meta.notes : it.notes;
+  $('#s-notes').innerHTML = notes.map(n => `
+    <li class="n ${n.by === 'claude' ? 'c' : 'l'}" title="${esc(n.by)} · ${esc(n.at.slice(0, 16).replace('T', ' '))}">
+      <i>${GLYPH[n.kind] || '·'}</i><p>${esc(n.text)}</p><button class="x" data-id="${esc(n.id)}" title="delete">×</button>
+    </li>`).join('');
+}
+function autosize() { const t = $('#s-in'); t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }
+
+$('#s-in').addEventListener('input', autosize);
+$('#s-in').addEventListener('keydown', async e => {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  e.preventDefault();
+  const raw = e.target.value.trim(); if (!raw || selected === null) return;
+  let kind = 'note', text = raw;
+  const m = raw.match(/^([+\-−–])\s*([\s\S]*)$/);
+  if (m) { kind = m[1] === '+' ? 'like' : 'dislike'; text = m[2].trim(); }
+  if (!text) return;
+  try {
+    await bapi(`/notes/${selected === 'board' ? 'board' : selected}`, json('POST', { text, kind, by: ME }));
+    e.target.value = ''; autosize(); await refresh();
+  } catch (err) { toast(err.message); }
+});
+$('#s-notes').addEventListener('click', async e => {
+  const b = e.target.closest('.x'); if (!b) return;
+  await bapi(`/notes/${selected === 'board' ? 'board' : selected}/${b.dataset.id}`, { method: 'DELETE' }).catch(err => toast(err.message));
+  refresh();
+});
+for (const [sel, key] of [['#s-title', 'title'], ['#s-src', 'source']]) {
+  const el = $(sel);
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') el.blur(); });
+  el.addEventListener('change', () => { if (typeof selected === 'number') patch(selected, { [key]: el.value }); });
+}
+$('#s-close').onclick = () => select(null);
+$('#s-fig').onclick = () => { const it = items.get(selected); if (it) window.open(fileUrl(it), '_blank'); };
+
+// ---------- board menu ----------
+$('#bname').onclick = () => select(selected === 'board' ? null : 'board');
+$('#bsw').onclick = async e => {
+  e.stopPropagation();
+  const m = $('#menu');
+  if (!m.hidden) { closeMenu(); return; }
+  const d = await api('/api/boards');
+  m.querySelector('ul').innerHTML = d.boards.map(b =>
+    `<li data-name="${esc(b.name)}"${b.name === board ? ' class="cur"' : ''}>${esc(b.name)}<span>${b.count}</span></li>`).join('');
+  m.hidden = false; $('#bsw').setAttribute('aria-expanded', 'true');
+};
+$('#menu').addEventListener('click', e => {
+  e.stopPropagation();
+  const li = e.target.closest('li'); if (!li) return;
+  closeMenu(); openBoard(li.dataset.name);
+});
+$('#newb').addEventListener('keydown', async e => {
+  if (e.key !== 'Enter') return;
+  const name = e.target.value.trim().toLowerCase().replace(/\s+/g, '-');
+  try { await api('/api/boards', json('POST', { name })); e.target.value = ''; closeMenu(); openBoard(name); }
+  catch (err) { toast(err.message); }
+});
+function closeMenu() { $('#menu').hidden = true; $('#bsw').setAttribute('aria-expanded', 'false'); }
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('#hud')) closeMenu();
+  if (!e.target.closest('#settings, #cog')) closeSettings();
+});
+
+// ---------- settings ----------
+function applyPrefs() {
+  const root = document.documentElement;
+  if (prefs.theme === 'system') root.removeAttribute('data-theme'); else root.dataset.theme = prefs.theme;
+  document.body.classList.toggle('ids', prefs.ids);
+  document.body.classList.toggle('nomarks', !prefs.marks);
+  $('#keys').hidden = items.size > 0 && !prefs.keys;
+  for (const b of document.querySelectorAll('[data-pref]')) b.setAttribute('aria-checked', prefs[b.dataset.pref]);
+  for (const b of $('#theme').children) b.setAttribute('aria-pressed', b.dataset.theme === prefs.theme);
+  applyCam();
+}
+function setPref(k, v) {
+  prefs[k] = v; ls.set('prefs', prefs); applyPrefs();
+}
+function closeSettings() { $('#settings').hidden = true; $('#cog').setAttribute('aria-expanded', 'false'); }
+$('#cog').onclick = () => {
+  const open = $('#settings').hidden;
+  $('#settings').hidden = !open; $('#cog').setAttribute('aria-expanded', open);
+};
+$('#settings').addEventListener('click', e => {
+  const sw = e.target.closest('[data-pref]'); if (sw) return setPref(sw.dataset.pref, !prefs[sw.dataset.pref]);
+  const th = e.target.closest('[data-theme]'); if (th) setPref('theme', th.dataset.theme);
+});
+
+// ---------- pointer ----------
+stage.addEventListener('pointerdown', e => {
+  if (e.button !== 0 && e.button !== 1) return;
+  const start = { sx: e.clientX, sy: e.clientY, moved: false, add: e.shiftKey || e.metaKey || e.ctrlKey };
+  const itEl = e.target.closest('.it');
+  if (e.button === 1 || spaceDown) {
+    drag = { ...start, mode: 'pan', cx: cam.x, cy: cam.y };
+  } else if (e.target.closest('.handle') && typeof selected === 'number') {
+    const it = items.get(selected); drag = { ...start, mode: 'resize', it, w0: it.w };
+  } else if (itEl && start.add) {
+    drag = { ...start, mode: 'toggle', it: items.get(+itEl.dataset.id) };
+  } else if (itEl) {
+    const it = items.get(+itEl.dataset.id);
+    const movers = (group.has(it.id) ? [...group].map(id => items.get(id)) : [it]).sort((a, b) => a.z - b.z);
+    drag = { ...start, mode: 'move', it, items: movers.map(o => ({ it: o, x0: o.x, y0: o.y })) };
+  } else {
+    drag = { ...start, mode: 'marquee', base: start.add ? currentSel() : new Set() };
+  }
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e => {
+  mouse = { x: e.clientX, y: e.clientY }; status();
+  if (!drag) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if (!drag.moved) {
+    if (Math.hypot(dx, dy) < 3) return;
+    drag.moved = true;
+    if (drag.mode === 'move') {
+      drag.items.forEach(o => raise(o.it));
+      if (!group.has(drag.it.id) && selected !== null && selected !== drag.it.id) select(drag.it.id);
+    }
+    if (drag.mode === 'pan') stage.classList.add('panning');
+    if (drag.mode === 'marquee') { if (!drag.add) select(null); $('#marq').hidden = false; }
+  }
+  if (drag.mode === 'move') {
+    for (const o of drag.items) { o.it.x = o.x0 + dx / cam.z; o.it.y = o.y0 + dy / cam.z; syncEl(o.it); }
+    drawSel();
+  }
+  else if (drag.mode === 'marquee') {
+    const x0 = Math.min(drag.sx, e.clientX), y0 = Math.min(drag.sy, e.clientY);
+    const x1 = Math.max(drag.sx, e.clientX), y1 = Math.max(drag.sy, e.clientY);
+    Object.assign($('#marq').style, { left: x0 + 'px', top: y0 + 'px', width: x1 - x0 + 'px', height: y1 - y0 + 'px' });
+    const a = toWorld(x0, y0), b = toWorld(x1, y1);
+    group = new Set(drag.base);
+    for (const it of items.values()) if (it.x < b.x && it.x + it.w > a.x && it.y < b.y && it.y + ih(it) > a.y) group.add(it.id);
+    paintGroup(); drawSel(); status();
+  }
+  else if (drag.mode === 'resize') { drag.it.w = Math.max(40, drag.w0 + dx / cam.z); syncEl(drag.it); drawSel(); }
+  else { cam.x = drag.cx - dx / cam.z; cam.y = drag.cy - dy / cam.z; applyCam(); }
+});
+function endDrag() {
+  const d = drag; drag = null; stage.classList.remove('panning');
+  if (!d) return;
+  if (d.mode === 'move') {
+    if (d.moved) for (const o of d.items) patch(o.it.id, { x: o.it.x, y: o.it.y, z: o.it.z });
+    else select(d.it.id);            // plain click inside a group narrows to that item
+  } else if (d.mode === 'resize') { if (d.moved) patch(d.it.id, { w: d.it.w }); }
+  else if (d.mode === 'toggle') {
+    const next = currentSel();
+    if (!next.delete(d.it.id)) next.add(d.it.id);
+    setGroup(next);
+  }
+  else if (d.mode === 'marquee') {
+    $('#marq').hidden = true;
+    if (d.moved) setGroup(group); else if (!d.add) select(null);
+  }
+}
+function currentSel() { return group.size ? new Set(group) : new Set(typeof selected === 'number' ? [selected] : []); }
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('dblclick', e => {
+  const el = e.target.closest('.it'); if (el) focusItem(items.get(+el.dataset.id));
+});
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002)));
+  else { cam.x += e.deltaX / cam.z; cam.y += e.deltaY / cam.z; applyCam(); }
+}, { passive: false });
+addEventListener('resize', applyCam);
+
+// ---------- zoom bar ----------
+// Hovering the bar turns the pan gesture into zoom, about the middle of the view,
+// so you can explore and zoom without lifting a finger or holding a key.
+const zoomEl = $('#zoom');
+const ZLN = [Math.log(ZMIN), Math.log(ZMAX)];
+const zt = z => (Math.log(z) - ZLN[0]) / (ZLN[1] - ZLN[0]);   // log scale: each doubling is the same distance
+zoomEl.style.setProperty('--z1', zt(1));
+function drawZoom() {
+  zoomEl.style.setProperty('--zt', zt(cam.z));
+  zoomEl.setAttribute('aria-valuenow', Math.round(cam.z * 100));
+  zoomEl.setAttribute('aria-valuetext', Math.round(cam.z * 100) + '%');
+}
+const ZOOM_PER_PX = 0.0045;    // ~4× per 300px of scroll; the whole range is ~1200px
+const viewMid = () => [(innerWidth - (selected !== null ? SIDE : 0)) / 2, innerHeight / 2];
+zoomEl.addEventListener('wheel', e => {
+  e.preventDefault();
+  // a pinch stays a pinch; a scroll moves the level with your fingers, as panning moves the board
+  zoomAt(...viewMid(), Math.exp(e.ctrlKey ? -e.deltaY * 0.01 : e.deltaY * ZOOM_PER_PX));
+}, { passive: false });
+function dragZoom(e) {
+  const r = zoomEl.querySelector('.track').getBoundingClientRect();
+  const t = Math.min(1, Math.max(0, (r.bottom - 3 - e.clientY) / (r.height - 6)));
+  zoomAt(...viewMid(), Math.exp(ZLN[0] + t * (ZLN[1] - ZLN[0])) / cam.z);
+}
+zoomEl.addEventListener('pointerdown', e => { zoomEl.setPointerCapture(e.pointerId); zoomEl.classList.add('on'); dragZoom(e); });
+zoomEl.addEventListener('pointermove', e => { if (zoomEl.hasPointerCapture(e.pointerId)) dragZoom(e); });
+zoomEl.addEventListener('lostpointercapture', () => zoomEl.classList.remove('on'));
+addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; document.body.classList.remove('space'); } });
+addEventListener('blur', () => { spaceDown = false; document.body.classList.remove('space'); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyCam);
+
+// ---------- keys ----------
+const KEYS = 'paste ⌘V · drag selects · ⇧click adds · ⌘A all · space-drag or scroll pans · pinch, ⌘scroll or scroll on the left bar zooms<br>1–9 rate (1 repels · 5 meh · 9 essential) · 0 clear · ← → step<br>0 fit · f focus · t trim · g grid · i ids · ⌫ trash · ⌘Z restore · ? keys';
+
+// ---------- rating ----------
+const RATING_WORDS = ['', 'repels', 'dislike', 'off', 'meh', 'indifferent', 'ok', 'like', 'love', 'essential'];
+async function rate(it, r) {
+  const prev = it.rating;
+  it.rating = r ?? undefined; syncEl(it); renderSide();          // optimistic
+  try {
+    const u = await bapi(`/items/${it.id}/rate`, json('POST', { rating: r }));
+    items.set(u.id, u); syncEl(u); renderSide();
+    toast(r ? `#${u.id} · ${r} ${RATING_WORDS[r]}` : `#${u.id} · cleared`);
+  } catch (err) { it.rating = prev; syncEl(it); renderSide(); toast(err.message); }
+}
+// reading order: rows (by top edge, in bands) then left→right
+function readingOrder() {
+  return [...items.values()].sort((a, b) => (Math.floor(a.y / 250) - Math.floor(b.y / 250)) || (a.x - b.x));
+}
+function step(dir) {
+  const order = readingOrder(); if (!order.length) return;
+  const i = order.findIndex(o => o.id === selected);
+  const next = order[i < 0 ? (dir > 0 ? 0 : order.length - 1) : (i + dir + order.length) % order.length];
+  select(next.id); ensureVisible(next);
+}
+function ensureVisible(it) {
+  const W = innerWidth - (selected !== null ? SIDE : 0), H = innerHeight, m = 40;
+  const a = toScreen(it.x, it.y), b = toScreen(it.x + it.w, it.y + ih(it));
+  if (a.x >= m && a.y >= m && b.x <= W - m && b.y <= H - m) return;
+  cam.x = it.x + it.w / 2 - W / 2 / cam.z; cam.y = it.y + ih(it) / 2 - H / 2 / cam.z;
+  applyCam();
+}
+$('#s-rate').addEventListener('click', e => {
+  const b = e.target.closest('button'); const it = items.get(selected); if (!b || !it) return;
+  const r = +b.dataset.r; rate(it, it.rating === r ? null : r);   // click the current value to clear
+});
+$('#keys').innerHTML = KEYS;
+applyPrefs();
+document.addEventListener('keydown', async e => {
+  if (document.body.classList.contains('home')) return;
+  if (e.target.closest('input, textarea')) { if (e.key === 'Escape') e.target.blur(); return; }
+  if (e.code === 'Space') { e.preventDefault(); spaceDown = true; document.body.classList.add('space'); return; }
+  const it = typeof selected === 'number' ? items.get(selected) : null;
+  if (e.key === 'Escape') { if (!$('#settings').hidden) closeSettings(); else if (!$('#menu').hidden) closeMenu(); else select(null); }
+  else if ((e.key === 'Backspace' || e.key === 'Delete') && (it || group.size)) {
+    const ids = it ? [it.id] : [...group];
+    trashed.push(ids); select(null); ids.forEach(dropEl);
+    await Promise.all(ids.map(id => bapi(`/items/${id}`, { method: 'DELETE' }).catch(err => toast(err.message))));
+    toast(`${ids.length > 1 ? ids.length + ' items' : '#' + ids[0]} → trash · ⌘Z`); refresh();
+  }
+  else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+    const ids = trashed.pop(); if (!ids) return;
+    try {
+      for (const id of ids) await bapi(`/restore/${id}`, { method: 'POST' });
+      toast(ids.length > 1 ? `restored ${ids.length} items` : `restored #${ids[0]}`); await refresh();
+    } catch (err) { toast(err.message); }
+  }
+  else if ((e.metaKey || e.ctrlKey) && e.key === 'a') { e.preventDefault(); setGroup(new Set(items.keys())); }
+  else if (e.metaKey || e.ctrlKey || e.altKey) return;
+  else if (/^Digit[0-9]$/.test(e.code) && (it || group.size)) {
+    for (const o of it ? [it] : [...group].map(id => items.get(id))) rate(o, +e.code.slice(5) || null);
+  }
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); step(+1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
+  else if (e.key === '0') fit();
+  else if (e.key === 'f' && it) focusItem(it);
+  else if (e.key === 't' && it) {
+    try { const t = await bapi(`/items/${it.id}/trim`, { method: 'POST' }); dropEl(it.id); items.set(t.id, t); syncEl(t); select(t.id); toast(`#${t.id} trimmed`); }
+    catch (err) { toast(err.message); }
+  }
+  else if (e.key === 'g') setPref('grid', !prefs.grid);
+  else if (e.key === 'i') setPref('ids', !prefs.ids);
+  else if (e.key === '=' || e.key === '+') zoomAt(innerWidth / 2, innerHeight / 2, 1.25);
+  else if (e.key === '-') zoomAt(innerWidth / 2, innerHeight / 2, 0.8);
+  else if (e.key === '?') setPref('keys', !prefs.keys);
+});
+
+// ---------- paste / drop ----------
+function dropPoint(sx, sy) {
+  if (selected !== null && sx > innerWidth - SIDE) sx = (innerWidth - SIDE) / 2;
+  return toWorld(sx, sy);
+}
+function imgSrcFrom(html) {
+  if (!html) return '';
+  try {
+    const s = new DOMParser().parseFromString(html, 'text/html').querySelector('img[src]')?.getAttribute('src') || '';
+    return /^https?:\/\//.test(s) ? s : '';
+  } catch { return ''; }
+}
+async function upload(file, at, source = '') {
+  const dims = {};
+  try { const b = await createImageBitmap(file); dims.iw = b.width; dims.ih = b.height; b.close(); } catch {}
+  const q = new URLSearchParams({ cx: Math.round(at.x), cy: Math.round(at.y), source, by: ME, ...dims });
+  const it = await bapi('/items?' + q, { method: 'POST', body: file });
+  items.set(it.id, it); syncEl(it); $('#empty').hidden = true;
+  return it;
+}
+async function fetchUrl(url, at) {
+  toast('fetching…', true);
+  const it = await bapi('/fetch', json('POST', { url, cx: Math.round(at.x), cy: Math.round(at.y), by: ME }));
+  items.set(it.id, it); syncEl(it); $('#empty').hidden = true;
+  toast(it.title ? `#${it.id} · ${it.title}` : `#${it.id}`);
+  return it;
+}
+async function ingest({ files, html, text, uri }, at) {
+  const src = imgSrcFrom(html);
+  try {
+    if (files.length) {
+      let off = 0;
+      for (const f of files) { await upload(f, { x: at.x + off, y: at.y + off }, src || uri || ''); off += 40; }
+      toast(files.length > 1 ? `added ${files.length}` : 'added');
+    } else if (/^https?:\/\/\S+$/.test(text)) await fetchUrl(text, at);
+    else if (uri) await fetchUrl(uri, at);
+    else if (src) await fetchUrl(src, at);
+    else toast('nothing image-shaped to paste');
+  } catch (err) { toast(err.message); }
+}
+document.addEventListener('paste', e => {
+  if (!board || e.target.closest('input, textarea')) return;
+  e.preventDefault();
+  const dt = e.clipboardData;
+  ingest({
+    files: [...dt.files].filter(f => f.type.startsWith('image/')),
+    html: dt.getData('text/html'), text: dt.getData('text/plain').trim(), uri: '',
+  }, dropPoint(mouse.x, mouse.y));
+});
+stage.addEventListener('dragover', e => e.preventDefault());
+stage.addEventListener('drop', e => {
+  e.preventDefault();
+  const dt = e.dataTransfer;
+  const files = [...dt.files].filter(f => f.type.startsWith('image/'));
+  const uri = (dt.getData('text/uri-list') || '').split(/\r?\n/).map(s => s.trim()).find(s => /^https?:\/\//.test(s)) || '';
+  const html = dt.getData('text/html');
+  // from a browser tab: fetch the original by URL (keeps the source); from Finder: upload the file
+  const fromWeb = imgSrcFrom(html) || uri;
+  ingest(fromWeb && !files.length ? { files: [], html, text: '', uri: imgSrcFrom(html) || uri }
+                                  : { files, html, text: '', uri },
+         dropPoint(e.clientX, e.clientY));
+});
+
+// ---------- boot ----------
+(async () => {
+  const m = location.pathname.match(/^\/b\/([^/]+)/);
+  if (!m) return showHome();
+  const name = decodeURIComponent(m[1]);
+  const hash = location.hash;
+  try { await openBoard(name); followHash(hash); }
+  catch (e) { toast(e.message, true); }
+})();
+// ---------- home ----------
+const miniUrl = (b, it) => `/api/b/${encodeURIComponent(b.name)}/img/512/${it.file}?v=${encodeURIComponent(it.added)}`;
+const fullUrl = (b, it) => `/api/b/${encodeURIComponent(b.name)}/file/${it.file}?v=${encodeURIComponent(it.added)}`;
+// the best few images as a mosaic; layouts exist for 1, 2, 3, 4 and 6 tiles, so 5 shows 4
+function previewHtml(b) {
+  if (!b.count) return '<div class="pv"><span class="none">empty</span></div>';
+  const its = b.items || [];          // absent when the server predates ?preview
+  const n = its.length >= 6 ? 6 : its.length === 5 ? 4 : its.length;
+  return `<div class="pv n${n}">` + its.slice(0, n).map(i =>
+    `<img loading="lazy" decoding="async" alt="" src="${miniUrl(b, i)}" data-full="${fullUrl(b, i)}">`).join('') + '</div>';
+}
+const NEW_CARD_INNER = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>New moodboard</span>';
+async function showHome() {
+  document.body.classList.add('home');
+  $('#home').hidden = false; document.title = 'mood';
+  const d = await api('/api/boards?preview=true');
+  const boards = d.boards.sort((a, b) => (b.modified || 0) - (a.modified || 0));
+  $('#cards').innerHTML = `<div class="card new" tabindex="0" role="button" aria-label="new moodboard">${NEW_CARD_INNER}</div>` + boards.map(b => `
+    <a class="card" href="/b/${encodeURIComponent(b.name)}">
+      ${previewHtml(b)}
+      <div class="meta"><b>${esc(b.name)}</b><span>${b.count} ${b.count === 1 ? 'image' : 'images'}</span></div>
+    </a>`).join('');
+}
+// a missing small preview (svg, undecodable) falls back to the original file
+$('#cards').addEventListener('error', e => {
+  const img = e.target; if (img.tagName !== 'IMG' || !img.dataset.full) return;
+  img.src = img.dataset.full; delete img.dataset.full;
+}, true);
+function newBoardPrompt(card) {
+  if (card.classList.contains('editing')) return;
+  card.classList.add('editing');
+  card.innerHTML = '<input placeholder="name" spellcheck="false" autocomplete="off"><small>enter to create · esc to cancel</small>';
+  const input = card.querySelector('input'); input.focus();
+  const reset = () => { card.classList.remove('editing'); card.innerHTML = NEW_CARD_INNER; };
+  input.addEventListener('keydown', async e => {
+    if (e.key === 'Escape') return reset();
+    if (e.key !== 'Enter' || e.isComposing) return;
+    const name = input.value.trim().toLowerCase().replace(/\s+/g, '-'); if (!name) return;
+    try { await api('/api/boards', json('POST', { name })); location.href = '/b/' + encodeURIComponent(name); }
+    catch (err) { toast(err.message); }
+  });
+  input.addEventListener('blur', () => { if (!input.value.trim()) reset(); });
+}
+$('#cards').addEventListener('click', e => { const c = e.target.closest('.card.new'); if (c) newBoardPrompt(c); });
+$('#cards').addEventListener('keydown', e => {
+  const c = e.target.closest('.card.new');
+  if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); newBoardPrompt(c); }
+});
+
+// #12 opens and frames item 12; #board opens board notes
+function followHash(h) {
+  const m = (h || '').match(/^#(\d+|board)$/);
+  if (!m) return;
+  if (m[1] === 'board') return select('board');
+  const it = items.get(+m[1]);
+  if (it) { select(it.id); focusItem(it); } else toast(`no #${m[1]} on ${board}`);
+}
+addEventListener('hashchange', () => followHash(location.hash));
+</script>
+</body>
+</html>

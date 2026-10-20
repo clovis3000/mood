@@ -1,0 +1,19 @@
+# mood
+
+A moodboard is a folder of images plus sidecars; the browser canvas (human) and the CLI (AI) are two views onto the same files. `mood --help` is the canonical usage; don't mirror it here.
+
+## Anti-patterns
+
+- **Don't make the CLI talk to the server.** Files are the source of truth so `mood note`/`add`/`view` work with no server running; the browser picks up changes by polling `rev`. Routing CLI writes through HTTP would make the AI's side of the board depend on the human's tab being open. (2026-10-08, founding decision)
+- **Don't consolidate item state into one board-wide file.** Positions and notes live in per-item `<id>.json` so a drag in the browser and a `mood note` from the CLI touch different files; a single `board.json` of items would turn every concurrent write into a lost update. `board.json` holds only board notes and the id counter. (2026-10-08)
+- **Don't change the grid cell size in one place.** `CELL` is duplicated in `src/store.rs` and `assets/index.html`; the cell names (A1, C3…) are the shared vocabulary between human and AI, and a mismatch makes "the cluster in C3" mean two different places. (2026-10-08)
+- **Don't change `TIERS` or `tierable` in one place.** Both are duplicated in `src/store.rs` and `assets/index.html`. If the canvas asks for a size the server doesn't make, the request fails and the tile quietly falls back to its full original, so the board looks fine while using hundreds of MB again (wake-up: 351 MB of originals vs 18 MB of copies at fit zoom). (2026-10-19)
+- **Don't point canvas tiles at `/file/` directly.** Use `srcFor`. Only the zoom-picked copies keep decoded memory in proportion to what's on screen. (2026-10-19)
+- **Don't let a GET route change anything, and don't loosen `guard`'s Host check.** `guard` in `src/server.rs` refuses any non-GET without an `x-mood` header, which another site's page can't send without a CORS preflight. GETs aren't checked, so a GET that writes would be open to every website again. The Host check stops DNS rebinding, where a site points its own name at 127.0.0.1 to look same-origin. Before this, a plain cross-site POST from any page added an image to a board (tested 2026-10-20). (2026-10-20)
+- **Don't add CORS headers to the server for `extension/`.** The extension reaches `localhost` through its host permissions, which already bypass CORS. Allowing other origins would let any website you visit write to your boards. (2026-10-20)
+- **Don't have the extension send image URLs when it can send bytes.** It downloads the image itself, with Chrome's cookies, and uploads the bytes. The server's `/fetch` has no sign-ins and gets refused by Instagram, Pinterest and other logged-in sites, so it's only the fallback. (2026-10-20)
+- **Don't place an unplaced image by scanning from a fixed corner.** Boards grow wherever you work, so the first free spot from A1 is usually far from all of it. The first image added from Chrome landed alone in A1 while the whole inbox sat in row 3. `Place::Beside` puts it next to the newest item's group instead. (2026-10-20)
+- **Don't find Google Images results by class name in `extension/content.js`.** Google's class names are generated and change between deploys. A result's own page comes from the tile's `data-lpage` attribute or the preview panel's "Visit" link around the image. Without it, the source was a 1,500-character search URL (#13 on inbox, 2026-10-20). (2026-10-20)
+- **Don't reuse item ids.** The browser caches images immutably by URL and `restore` brings ids back from `.trash/`; `take_id` checks items, trash and the counter for that reason. (2026-10-08)
+- **Don't add a build step to `assets/index.html`.** It's embedded with `include_str!` into a single binary; `MOOD_DEV=1 mood serve` reads it from disk for live edits. (2026-10-08)
+- **Don't hard-delete.** `rm` and ⌫ move to `.trash/`, which is what makes a one-key delete on the canvas safe. (2026-10-08)

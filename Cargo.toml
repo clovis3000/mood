@@ -1,0 +1,24 @@
+[package]
+name = "mood"
+version = "0.1.0"
+edition = "2021"
+description = "Moodboards on disk: a browser canvas for humans, a CLI for Claude"
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+image = "0.25"
+imageproc = "0.25"
+ab_glyph = "0.2"
+imagesize = "0.13"
+ureq = "2"
+url = "2"
+regex = "1"
+chrono = "0.4"
+
+[profile.release]
+opt-level = 3
