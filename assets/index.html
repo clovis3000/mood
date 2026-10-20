@@ -153,7 +153,8 @@ body.open #status { right: calc(var(--side) + 16px); }
   background: color-mix(in srgb, var(--ink) 45%, transparent);
   bottom: clamp(3px, calc(3px + (100% - 6px) * var(--zt, .5) - 3px), calc(100% - 9px)); transition: background .15s; }
 #zoom:hover .knob, #zoom.on .knob { background: color-mix(in srgb, var(--ink) 70%, transparent); }
-#settings { position: fixed; left: 12px; bottom: calc(var(--hit) + 20px); width: 300px; padding: 8px; z-index: 7; }
+#settings { position: fixed; left: 12px; bottom: calc(var(--hit) + 20px); width: 300px; padding: 8px; z-index: 7;
+  transform-origin: 0 100%; }   /* the corner nearest the cog, so closing shrinks back into it */
 #settings h2 { margin: 0; padding: 10px 12px 6px; font-size: 12px; font-weight: 600; color: var(--mute);
   text-transform: uppercase; letter-spacing: .06em; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: var(--hit);
@@ -675,8 +676,23 @@ function setPref(k, v) {
 // between them. A click (or Enter) opens them too, for keyboards and touch.
 let settingsT = 0;
 const SETTINGS_LINGER = 250;
-function openSettings() { clearTimeout(settingsT); $('#settings').hidden = false; $('#cog').setAttribute('aria-expanded', 'true'); }
-function closeSettings() { clearTimeout(settingsT); $('#settings').hidden = true; $('#cog').setAttribute('aria-expanded', 'false'); }
+let settingsAnim = null;
+function openSettings() {
+  clearTimeout(settingsT);
+  settingsAnim?.cancel(); settingsAnim = null;   // coming back mid-close snaps it open again
+  $('#settings').hidden = false; $('#cog').setAttribute('aria-expanded', 'true');
+}
+function closeSettings() {
+  clearTimeout(settingsT);
+  const el = $('#settings');
+  $('#cog').setAttribute('aria-expanded', 'false');
+  if (el.hidden || settingsAnim) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.hidden = true; return; }
+  // shrink back toward the cog and fade, then hide
+  settingsAnim = el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.94)' }],
+    { duration: 180, easing: 'cubic-bezier(.4, 0, 1, 1)' });
+  settingsAnim.finished.then(() => { el.hidden = true; settingsAnim = null; }, () => {});
+}
 $('#cog').onclick = openSettings;
 for (const el of [$('#cog'), $('#settings')]) {
   el.addEventListener('pointerenter', openSettings);
