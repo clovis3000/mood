@@ -670,11 +670,18 @@ function applyPrefs() {
 function setPref(k, v) {
   prefs[k] = v; ls.set('prefs', prefs); applyPrefs();
 }
-function closeSettings() { $('#settings').hidden = true; $('#cog').setAttribute('aria-expanded', 'false'); }
-$('#cog').onclick = () => {
-  const open = $('#settings').hidden;
-  $('#settings').hidden = !open; $('#cog').setAttribute('aria-expanded', open);
-};
+// Hovering the cog opens settings; they stay open while the cursor is on the cog
+// or the panel, and close a beat after it leaves both, long enough to cross the gap
+// between them. A click (or Enter) opens them too, for keyboards and touch.
+let settingsT = 0;
+const SETTINGS_LINGER = 250;
+function openSettings() { clearTimeout(settingsT); $('#settings').hidden = false; $('#cog').setAttribute('aria-expanded', 'true'); }
+function closeSettings() { clearTimeout(settingsT); $('#settings').hidden = true; $('#cog').setAttribute('aria-expanded', 'false'); }
+$('#cog').onclick = openSettings;
+for (const el of [$('#cog'), $('#settings')]) {
+  el.addEventListener('pointerenter', openSettings);
+  el.addEventListener('pointerleave', () => { clearTimeout(settingsT); settingsT = setTimeout(closeSettings, SETTINGS_LINGER); });
+}
 $('#settings').addEventListener('click', e => {
   const sw = e.target.closest('[data-pref]'); if (sw) return setPref(sw.dataset.pref, !prefs[sw.dataset.pref]);
   const th = e.target.closest('[data-theme]'); if (th) setPref('theme', th.dataset.theme);
